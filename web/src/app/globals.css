@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in-up { animation: fade-in-up 0.4s ease-out both; }
+
+@keyframes float-slow {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(20px, -10px); }
+}
+.animate-float-slow { animation: float-slow 8s ease-in-out infinite; }
+
+@keyframes float-slower {
+  0%, 100% { transform: translate(0, 0); }
+  50%      { transform: translate(-25px, 15px); }
+}
+.animate-float-slower { animation: float-slower 11s ease-in-out infinite; }
+
+/* Bright, colorful layered background */
+.app-bg {
+  position: relative;
+  background:
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 90% 20%, rgba(236, 72, 153, 0.12) 0%, transparent 55%),
+    radial-gradient(ellipse 70% 60% at 0% 70%, rgba(34, 197, 235, 0.10) 0%, transparent 60%),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 60%, #f1f5f9 100%);
+  background-attachment: fixed;
+}
+
+/* Dotted pattern overlay */
+.app-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 50%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.15) 50%, transparent 100%);
+  z-index: 0;
+}
+
+.scroll-thin::-webkit-scrollbar { height: 10px; width: 10px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; }
+.scroll-thin::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+.scroll-thin::-webkit-scrollbar-track { background: transparent; }
+
+.glass {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: saturate(160%) blur(14px);
+  -webkit-backdrop-filter: saturate(160%) blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 10px 30px -10px rgba(15, 23, 42, 0.08);
+}
