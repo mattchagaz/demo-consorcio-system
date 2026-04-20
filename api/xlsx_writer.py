@@ -1,25 +1,10 @@
-"""Generate consolidated XLSX in "listão" format — one row per cota.
+"""Generate consolidated XLSX — one row per parcela (mirrors the web preview table).
 
-Layout:
-
-    Row 1: title / totals
-    Row 2: (blank)
-    Row 3: column headers
-    Row 4..N: one row per cota
-    Row N+1: totals row
-
-Columns:
-    A  Mês                         (sequential index)
-    B  Cota                        ("grupo-cota")
-    C  Cota contemplada            (Valor Crédito do contrato)
-    D  Cont. Lanc. Emb             (Lance Embutido líquido)
-    E  Saldo Contemplação          (= C - D, fórmula)
-    F  Soma                        (soma corrente de E, fórmula)
-    G  Pagamentos                  (total pago = FC + FR + TxAdm)
-    H  Saldo Crédito - Parcelas    (= E - soma corrente de G, fórmula)
+Supports optional column filtering via the `columns` parameter.
 """
 from __future__ import annotations
 
+from datetime import datetime
 from io import BytesIO
 from typing import Iterable
 
@@ -31,7 +16,7 @@ from parser import ExtractResult
 
 
 MONEY_FMT = "#,##0.00"
-COL_WIDTHS = [6, 10, 10, 18, 18, 20, 18, 18, 24]
+PCT_FMT = "0.0000"
 
 TITLE_FONT = Font(bold=True, size=14, color="1E3A8A")
 HEADER_FONT = Font(bold=True, color="FFFFFF", size=10)
@@ -45,17 +30,24 @@ THIN = Side(style="thin", color="CBD5E1")
 BOX = Border(top=THIN, bottom=THIN, left=THIN, right=THIN)
 TOP_BORDER = Border(top=Side(style="medium", color="334155"))
 
-
-HEADERS = [
-    "Mês",
-    "Grupo",
-    "Cota",
-    "Cota contemplada",
-    "Cont. Lanc. Emb",
-    "Saldo Contemplação",
-    "Soma",
-    "Pagamentos",
-    "Saldo Crédito - Parcelas",
+# (key, header_label, width)
+ALL_COLUMNS = [
+    ("num", "#", 6),
+    ("grupo", "Grupo", 10),
+    ("cota", "Cota", 12),
+    ("contrato", "Contrato", 16),
+    ("emissao", "Emissão", 14),
+    ("prazo", "Prazo", 10),
+    ("parcelas", "Parcelas", 10),
+    ("vencto", "Vencto", 14),
+    ("pagto", "Pagto", 14),
+    ("vl_credito", "Vl. Crédito", 16),
+    ("vl_devido", "Vl. Devido", 14),
+    ("vl_pago", "Vl. Pago", 14),
+    ("pct_pago", "% Pago", 10),
+    ("quota_consorcio", "Quota Consórcio", 16),
+    ("fundo_reserva", "Fundo Reserva", 16),
+    ("taxa_adm", "Taxa ADM", 16),
 ]
 
 
@@ -65,43 +57,58 @@ def _money(cell, value):
     cell.alignment = RIGHT
 
 
-def build_xlsx(results: Iterable[ExtractResult], sheet_name: str = "Listão") -> bytes:
+def _date(cell, value: str):
+    try:
+        cell.value = datetime.strptime(value, "%d/%m/%Y")
+        cell.number_format = "DD/MM/YYYY"
+    except (ValueError, TypeError):
+        cell.value = value
+    cell.alignment = CENTER
+
+
+def build_xlsx(
+    results: Iterable[ExtractResult],
+    sheet_name: str = "Extratos",
+    columns: list[str] | None = None,
+) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = sheet_name[:31]
 
-    for i, w in enumerate(COL_WIDTHS, 1):
+    results = list(results)
+
+    # Determine active columns
+    if columns:
+        active = [c for c in ALL_COLUMNS if c[0] in columns]
+    else:
+        active = list(ALL_COLUMNS)
+
+    keys = [c[0] for c in active]
+
+    def col_of(key: str) -> int | None:
+        try:
+            return keys.index(key) + 1
+        except ValueError:
+            return None
+
+    # Column widths
+    for i, (_, _, w) in enumerate(active, 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
-    results = list(results)
-    n = len(results)
+    # Flatten: one row per parcela
+    rows_data = []
+    for r in results:
+        parcelas = sorted(r.conta_corrente, key=lambda p: int(p.ass))
+        for p in parcelas:
+            rows_data.append((r, p))
 
-    # Title + totals
-    c = ws.cell(row=1, column=1, value="Crédito Contratado")
-    c.font = TITLE_FONT
-    c.alignment = LEFT
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=3)
-
-    first_data = 4
+    n = len(rows_data)
+    first_data = 2
     last_data = first_data + n - 1
 
-    if n:
-        c = ws.cell(row=1, column=4, value=f"=SUM(D{first_data}:D{last_data})")
-        c.font = TITLE_FONT
-        c.number_format = MONEY_FMT
-        c.alignment = RIGHT
-
-        c = ws.cell(row=1, column=8, value="Total Pagamentos")
-        c.font = TITLE_FONT
-        c.alignment = RIGHT
-        c = ws.cell(row=1, column=9, value=f"=SUM(H{first_data}:H{last_data})")
-        c.font = TITLE_FONT
-        c.number_format = MONEY_FMT
-        c.alignment = RIGHT
-
     # Header row
-    hdr_row = 3
-    for i, label in enumerate(HEADERS, 1):
+    hdr_row = 1
+    for i, (_, label, _) in enumerate(active, 1):
         c = ws.cell(row=hdr_row, column=i, value=label)
         c.font = HEADER_FONT
         c.fill = HEADER_FILL
@@ -109,40 +116,67 @@ def build_xlsx(results: Iterable[ExtractResult], sheet_name: str = "Listão") ->
         c.border = BOX
 
     # Data rows
-    for idx, r in enumerate(results):
+    for idx, (r, p) in enumerate(rows_data):
         row = first_data + idx
-        ws.cell(row=row, column=1, value=idx + 1).alignment = CENTER
-        ws.cell(row=row, column=2, value=r.grupo).alignment = CENTER
-        ws.cell(row=row, column=3, value=r.cota).alignment = CENTER
-
-        _money(ws.cell(row=row, column=4), r.contrato_valor_credito)
-        _money(ws.cell(row=row, column=5), r.lance_embutido)
-        _money(ws.cell(row=row, column=6), f"=D{row}-E{row}")
-        _money(ws.cell(row=row, column=7), f"=SUM($F${first_data}:F{row})")
-        _money(ws.cell(row=row, column=8), r.valores_pagos.total)
-        _money(ws.cell(row=row, column=9), f"=F{row}-SUM($H${first_data}:H{row})")
+        for ci_idx, key in enumerate(keys):
+            col = ci_idx + 1
+            if key == "num":
+                ws.cell(row=row, column=col, value=idx + 1).alignment = CENTER
+            elif key == "grupo":
+                ws.cell(row=row, column=col, value=r.grupo.lstrip("0") or "0").alignment = CENTER
+            elif key == "cota":
+                ws.cell(row=row, column=col, value=r.cota).alignment = CENTER
+            elif key == "contrato":
+                ws.cell(row=row, column=col, value=r.contrato).alignment = CENTER
+            elif key == "emissao":
+                _date(ws.cell(row=row, column=col), r.data_emissao)
+            elif key == "prazo":
+                prazo = f"{str(r.qtde_parcelas_pagas).zfill(3)}/{r.prazo_total}"
+                ws.cell(row=row, column=col, value=prazo).alignment = CENTER
+            elif key == "parcelas":
+                ws.cell(row=row, column=col, value=p.ass).alignment = CENTER
+            elif key == "vencto":
+                _date(ws.cell(row=row, column=col), p.vencto)
+            elif key == "pagto":
+                _date(ws.cell(row=row, column=col), p.pagto)
+            elif key == "vl_credito":
+                _money(ws.cell(row=row, column=col), p.vl_cred)
+            elif key == "vl_devido":
+                _money(ws.cell(row=row, column=col), p.vl_devido)
+            elif key == "vl_pago":
+                _money(ws.cell(row=row, column=col), p.vl_pago)
+            elif key == "pct_pago":
+                cell = ws.cell(row=row, column=col, value=p.pct_pago)
+                cell.number_format = PCT_FMT
+                cell.alignment = RIGHT
+            elif key == "quota_consorcio":
+                _money(ws.cell(row=row, column=col), r.valores_pagos.fundo_comum)
+            elif key == "fundo_reserva":
+                _money(ws.cell(row=row, column=col), r.valores_pagos.fundo_reserva)
+            elif key == "taxa_adm":
+                _money(ws.cell(row=row, column=col), r.valores_pagos.taxa_administracao)
 
     # Totals row
+    sum_keys = {"vl_credito", "vl_devido", "vl_pago", "quota_consorcio", "fundo_reserva", "taxa_adm"}
     if n:
         trow = last_data + 1
-        c = ws.cell(row=trow, column=3, value="TOTAL")
-        c.font = TOTAL_FONT
-        c.alignment = RIGHT
-        for col in (4, 5, 6, 8):
-            letter = get_column_letter(col)
-            cell = ws.cell(row=trow, column=col, value=f"=SUM({letter}{first_data}:{letter}{last_data})")
-            cell.number_format = MONEY_FMT
-            cell.font = TOTAL_FONT
-            cell.alignment = RIGHT
-            cell.fill = TOTAL_FILL
-            cell.border = TOP_BORDER
-        for col in (1, 2, 3, 7, 9):
+        for ci_idx, key in enumerate(keys):
+            col = ci_idx + 1
             cell = ws.cell(row=trow, column=col)
+            if key in sum_keys:
+                letter = get_column_letter(col)
+                cell.value = f"=SUM({letter}{first_data}:{letter}{last_data})"
+                cell.number_format = MONEY_FMT
+                cell.alignment = RIGHT
             cell.fill = TOTAL_FILL
             cell.font = TOTAL_FONT
             cell.border = TOP_BORDER
 
-    ws.freeze_panes = "A4"
+        # Label "TOTAL"
+        label_col = col_of("prazo") or col_of("contrato") or col_of("cota") or 1
+        ws.cell(row=trow, column=label_col, value="TOTAL").font = TOTAL_FONT
+
+    ws.freeze_panes = f"A{first_data}"
 
     buf = BytesIO()
     wb.save(buf)

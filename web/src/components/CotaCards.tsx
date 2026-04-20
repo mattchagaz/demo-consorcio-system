@@ -56,6 +56,11 @@ function CotaCard({ extract: e }: { extract: Extract }) {
             <span className="font-mono text-[10px] text-slate-400 hidden sm:inline">
               {e.contrato}
             </span>
+            {e.data_emissao && (
+              <span className="text-[10px] text-slate-400 hidden sm:inline">
+                Emissão: {e.data_emissao}
+              </span>
+            )}
           </div>
         </div>
         <div className="hidden sm:block text-right">
@@ -87,6 +92,9 @@ function CotaCard({ extract: e }: { extract: Extract }) {
                   <th className="px-4 py-2 text-right font-medium">Vl. Devido</th>
                   <th className="px-4 py-2 text-right font-medium">Vl. Pago</th>
                   <th className="px-4 py-2 text-right font-medium">% Pago</th>
+                  <th className="px-4 py-2 text-right font-medium">Quota Consórcio</th>
+                  <th className="px-4 py-2 text-right font-medium">Fundo Reserva</th>
+                  <th className="px-4 py-2 text-right font-medium">Taxa ADM</th>
                 </tr>
               </thead>
               <tbody>
@@ -112,6 +120,15 @@ function CotaCard({ extract: e }: { extract: Extract }) {
                     <td className="px-4 py-2 text-right tabular-nums text-slate-500">
                       {p.pct_pago.toFixed(4)}
                     </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-slate-600">
+                      {fmtBRL(e.valores_pagos.fundo_comum)}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-slate-600">
+                      {fmtBRL(e.valores_pagos.fundo_reserva)}
+                    </td>
+                    <td className="px-4 py-2 text-right tabular-nums text-slate-600">
+                      {fmtBRL(e.valores_pagos.taxa_administracao)}
+                    </td>
                   </tr>
                 ))}
                 <tr className="border-t-2 border-slate-200 bg-white">
@@ -121,6 +138,9 @@ function CotaCard({ extract: e }: { extract: Extract }) {
                   <td className="px-4 py-2 text-right tabular-nums font-bold text-indigo-600">
                     {fmtBRL(totalPago)}
                   </td>
+                  <td />
+                  <td />
+                  <td />
                   <td />
                 </tr>
               </tbody>

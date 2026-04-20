@@ -10,7 +10,7 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-30 glass border-b border-white/50">
-      <div className="max-w-6xl mx-auto px-6 py-3.5 flex items-center justify-between">
+      <div className="max-w-[90rem] mx-auto px-6 py-3.5 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl opacity-60" />

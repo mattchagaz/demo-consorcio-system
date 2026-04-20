@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Download, Loader2, Eye, Sparkles } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Dropzone } from "@/components/Dropzone";
@@ -9,6 +9,8 @@ import { StatsBar } from "@/components/StatsBar";
 import { CotaCards } from "@/components/CotaCards";
 import { PreviewTable, type Extract } from "@/components/PreviewTable";
 import { ViewTabs, type View } from "@/components/ViewTabs";
+import { ProgressBar } from "@/components/ProgressBar";
+import { ColumnPicker, ALL_COLUMNS, type ColumnKey } from "@/components/ColumnPicker";
 import { Toast } from "@/components/Toast";
 
 const API = "/api";
@@ -17,8 +19,13 @@ export default function Home() {
   const [files, setFiles] = useState<File[]>([]);
   const [extracts, setExtracts] = useState<Extract[]>([]);
   const [loading, setLoading] = useState<"preview" | "export" | null>(null);
+  const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [toast, setToast] = useState<{ kind: "error" | "success"; message: string } | null>(null);
   const [view, setView] = useState<View>("cards");
+  const [selectedColumns, setSelectedColumns] = useState<ColumnKey[]>(
+    ALL_COLUMNS.map((c) => c.key)
+  );
+  const abortRef = useRef<AbortController | null>(null);
 
   const addFiles = (incoming: File[]) => {
     setFiles((prev) => {
@@ -38,34 +45,85 @@ export default function Home() {
     setExtracts([]);
   };
 
-  const buildFormData = () => {
-    const fd = new FormData();
-    files.forEach((f) => fd.append("files", f));
-    return fd;
-  };
-
   const doPreview = async () => {
     setLoading("preview");
-    try {
-      const res = await fetch(`${API}/extract`, { method: "POST", body: buildFormData() });
-      if (!res.ok) throw new Error(await res.text());
-      const data = await res.json();
-      setExtracts(data.extracts);
+    setExtracts([]);
+    setProgress({ current: 0, total: files.length });
+
+    const results: Extract[] = [];
+    const errors: string[] = [];
+    abortRef.current = new AbortController();
+
+    for (let i = 0; i < files.length; i++) {
+      if (abortRef.current.signal.aborted) break;
+
+      const fd = new FormData();
+      fd.append("files", files[i]);
+
+      try {
+        const res = await fetch(`${API}/extract`, {
+          method: "POST",
+          body: fd,
+          signal: abortRef.current.signal,
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          errors.push(`${files[i].name}: ${text}`);
+        } else {
+          const data = await res.json();
+          results.push(...data.extracts);
+        }
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") break;
+        errors.push(`${files[i].name}: ${e instanceof Error ? e.message : "Erro"}`);
+      }
+
+      setProgress({ current: i + 1, total: files.length });
+    }
+
+    results.sort((a, b) =>
+      `${a.grupo}-${a.cota}`.localeCompare(`${b.grupo}-${b.cota}`)
+    );
+    setExtracts(results);
+
+    if (errors.length > 0) {
+      setToast({
+        kind: "error",
+        message: `${errors.length} erro(s): ${errors[0]}`,
+      });
+    } else if (results.length > 0) {
       setToast({
         kind: "success",
-        message: `${data.extracts.length} cota(s) processada(s) com sucesso.`,
+        message: `${results.length} cota(s) processada(s) com sucesso.`,
       });
-    } catch (e) {
-      setToast({ kind: "error", message: e instanceof Error ? e.message : "Erro ao extrair" });
-    } finally {
-      setLoading(null);
     }
+
+    setLoading(null);
+    abortRef.current = null;
   };
 
   const doExport = async () => {
     setLoading("export");
     try {
-      const res = await fetch(`${API}/export`, { method: "POST", body: buildFormData() });
+      let res: Response;
+
+      if (extracts.length > 0) {
+        // Use cached results + column selection
+        res = await fetch(`${API}/export-json`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            extracts: extracts,
+            columns: selectedColumns,
+          }),
+        });
+      } else {
+        // Fallback: send files directly
+        const fd = new FormData();
+        files.forEach((f) => fd.append("files", f));
+        res = await fetch(`${API}/export`, { method: "POST", body: fd });
+      }
+
       if (!res.ok) throw new Error(await res.text());
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -99,7 +157,7 @@ export default function Home() {
 
       <Header />
 
-      <main className="relative z-10 flex-1 w-full max-w-6xl mx-auto px-6 py-10 space-y-8">
+      <main className="relative z-10 flex-1 w-full max-w-[90rem] mx-auto px-6 py-10 space-y-8">
         {!hasExtracts && (
           <section className="text-center max-w-2xl mx-auto pt-4 pb-2 animate-fade-in-up">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-100 text-xs font-medium text-indigo-700 mb-4">
@@ -113,8 +171,7 @@ export default function Home() {
               </span>
             </h2>
             <p className="mt-3 text-slate-600">
-              Faça upload de vários PDFs e exporte tudo em um único arquivo Excel 
-              
+              Faça upload de vários PDFs e exporte tudo em um único arquivo Excel
             </p>
           </section>
         )}
@@ -136,8 +193,16 @@ export default function Home() {
           />
         )}
 
+        {loading === "preview" && progress.total > 1 && (
+          <ProgressBar
+            current={progress.current}
+            total={progress.total}
+            label="Processando PDFs"
+          />
+        )}
+
         {hasFiles && (
-          <section className="flex flex-wrap gap-3 animate-fade-in-up">
+          <section className="flex flex-wrap items-center gap-3 animate-fade-in-up">
             <button
               onClick={doPreview}
               disabled={busy}
@@ -162,6 +227,7 @@ export default function Home() {
               )}
               Baixar Excel ({files.length})
             </button>
+            <ColumnPicker selected={selectedColumns} onChange={setSelectedColumns} />
           </section>
         )}
 
@@ -174,11 +240,8 @@ export default function Home() {
               <ViewTabs value={view} onChange={setView} />
             </div>
 
-            {view === "cards" ? (
-              <CotaCards extracts={extracts} />
-            ) : (
-              <PreviewTable extracts={extracts} />
-            )}
+            {view === "cards" && <CotaCards extracts={extracts} />}
+            {view === "table" && <PreviewTable extracts={extracts} />}
           </section>
         )}
       </main>

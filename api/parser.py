@@ -19,6 +19,8 @@ HEADER_RE = re.compile(
     r"Grupo:\s*(?P<grupo>\d+)\s+Cota:\s*(?P<cota>[\d-]+)\s+(?P<nome>.+?)\s+Contrato:\s*(?P<contrato>\d+)"
 )
 
+EMISSAO_RE = re.compile(r"^(\d{2}/\d{2}/\d{4})\s+\d{2}:\d{2}:\d{2}", re.MULTILINE)
+
 VALOR_CREDITO_RE = re.compile(r"Valor Crédito:\s*([\d.,]+)")
 
 DATE_RE = re.compile(r"\d{2}/\d{2}/\d{4}")
@@ -86,6 +88,7 @@ class ValoresPagos:
 
 @dataclass
 class ExtractResult:
+    data_emissao: str = ""
     grupo: str = ""
     cota: str = ""
     nome: str = ""
@@ -113,9 +116,30 @@ class ExtractResult:
         return p.vl_pago if p else 0.0
 
 
+class InvalidPDFError(Exception):
+    """Raised when a PDF does not match the expected HS Administradora layout."""
+
+
+def _validate_hs_layout(text: str, filename: str = "") -> None:
+    """Check that the extracted text contains the key markers of an HS extract."""
+    required = [
+        ("HS ADMINISTRADORA", "cabeçalho da HS Administradora"),
+        ("Extrato do Consorciado", "título 'Extrato do Consorciado'"),
+        ("Conta Corrente", "seção 'Conta Corrente'"),
+    ]
+    missing = [desc for marker, desc in required if marker not in text]
+    if missing:
+        label = f"'{filename}': " if filename else ""
+        raise InvalidPDFError(
+            f"{label}Este PDF não é um extrato válido da HS Administradora. "
+            f"Não encontrado: {', '.join(missing)}."
+        )
+
+
 def parse_pdf(path: str) -> ExtractResult:
     with pdfplumber.open(path) as pdf:
         text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    _validate_hs_layout(text, filename=path.rsplit("/", 1)[-1])
     return parse_text(text)
 
 
@@ -138,6 +162,9 @@ def _extract_valor_pago(text: str, label: str) -> float:
 
 def parse_text(text: str) -> ExtractResult:
     result = ExtractResult()
+
+    if m := EMISSAO_RE.search(text):
+        result.data_emissao = m.group(1)
 
     if m := HEADER_RE.search(text):
         result.grupo = m.group("grupo")

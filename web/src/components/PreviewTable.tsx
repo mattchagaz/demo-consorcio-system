@@ -17,14 +17,24 @@ export type Parcela = {
   pct_difer: number;
 };
 
+export type ValoresPagos = {
+  fundo_comum: number;
+  fundo_reserva: number;
+  taxa_administracao: number;
+};
+
 export type Extract = {
+  data_emissao: string;
   grupo: string;
   cota: string;
   nome: string;
   contrato: string;
+  contrato_valor_credito: number;
+  lance_embutido: number;
   prazo_total: number;
   qtde_parcelas_pagas: number;
   conta_corrente: Parcela[];
+  valores_pagos: ValoresPagos;
 };
 
 const fmtBRL = (v: number) =>
@@ -49,6 +59,7 @@ export function PreviewTable({ extracts }: { extracts: Extract[] }) {
               <th className="px-3 py-2.5 text-left font-medium text-xs uppercase tracking-wide">Grupo</th>
               <th className="px-3 py-2.5 text-left font-medium text-xs uppercase tracking-wide">Cota</th>
               <th className="px-3 py-2.5 text-left font-medium text-xs uppercase tracking-wide">Contrato</th>
+              <th className="px-3 py-2.5 text-left font-medium text-xs uppercase tracking-wide">Emissão</th>
               <th className="px-3 py-2.5 text-left font-medium text-xs uppercase tracking-wide">Prazo</th>
               <th className="px-3 py-2.5 text-center font-medium text-xs uppercase tracking-wide">Parcelas</th>
               <th className="px-3 py-2.5 text-left font-medium text-xs uppercase tracking-wide">Vencto</th>
@@ -57,6 +68,9 @@ export function PreviewTable({ extracts }: { extracts: Extract[] }) {
               <th className="px-3 py-2.5 text-right font-medium text-xs uppercase tracking-wide">Vl. Devido</th>
               <th className="px-3 py-2.5 text-right font-medium text-xs uppercase tracking-wide">Vl. Pago</th>
               <th className="px-3 py-2.5 text-right font-medium text-xs uppercase tracking-wide">% Pago</th>
+              <th className="px-3 py-2.5 text-right font-medium text-xs uppercase tracking-wide">Quota Consórcio</th>
+              <th className="px-3 py-2.5 text-right font-medium text-xs uppercase tracking-wide">Fundo Reserva</th>
+              <th className="px-3 py-2.5 text-right font-medium text-xs uppercase tracking-wide">Taxa ADM</th>
             </tr>
           </thead>
           <tbody>
@@ -69,6 +83,7 @@ export function PreviewTable({ extracts }: { extracts: Extract[] }) {
                 <td className="px-3 py-2 text-slate-700">{e.grupo.replace(/^0+/, "")}</td>
                 <td className="px-3 py-2 text-slate-700">{e.cota}</td>
                 <td className="px-3 py-2 font-mono text-xs text-slate-500">{e.contrato}</td>
+                <td className="px-3 py-2 text-slate-600 text-xs">{e.data_emissao}</td>
                 <td className="px-3 py-2 text-slate-600 text-xs">
                   {String(e.qtde_parcelas_pagas).padStart(3, "0")}/{e.prazo_total}
                 </td>
@@ -86,6 +101,15 @@ export function PreviewTable({ extracts }: { extracts: Extract[] }) {
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-slate-500">
                   {p.pct_pago.toFixed(4)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                  {fmtBRL(e.valores_pagos.fundo_comum)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                  {fmtBRL(e.valores_pagos.fundo_reserva)}
+                </td>
+                <td className="px-3 py-2 text-right tabular-nums text-slate-600">
+                  {fmtBRL(e.valores_pagos.taxa_administracao)}
                 </td>
               </tr>
             ))}
