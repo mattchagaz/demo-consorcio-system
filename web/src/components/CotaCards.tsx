@@ -85,7 +85,7 @@ function CotaCard({ extract: e }: { extract: Extract }) {
             <table className="min-w-full text-sm">
               <thead>
                 <tr className="text-xs text-slate-500 uppercase tracking-wide">
-                  <th className="px-4 py-2 text-left font-medium">Ass</th>
+                  <th className="px-4 py-2 text-left font-medium">Parcelas</th>
                   <th className="px-4 py-2 text-left font-medium">Vencto</th>
                   <th className="px-4 py-2 text-left font-medium">Pagto</th>
                   <th className="px-4 py-2 text-right font-medium">Vl. Crédito</th>
