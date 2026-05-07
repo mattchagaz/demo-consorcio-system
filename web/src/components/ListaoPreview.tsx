@@ -5,13 +5,28 @@ import type { Extract } from "./PreviewTable";
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+type ListaoRow = {
+  mes: number;
+  grupo: string;
+  cota: string;
+  dataEmissao: string;
+  cotaContemplada: number;
+  fc: number;
+  fr: number;
+  txAdm: number;
+  lanceEmb: number;
+  saldoContemp: number;
+  soma: number;
+  pagamentos: number;
+  pagamentosAcumulados: number;
+  saldoCreditoParcelas: number;
+};
+
 export function ListaoPreview({ extracts }: { extracts: Extract[] }) {
   if (!extracts.length) return null;
 
   // Build rows with calculated columns (mirrors xlsx_writer logic)
-  let runSaldo = 0;
-  let runPagamentos = 0;
-  const rows = extracts.map((e, idx) => {
+  const rows = extracts.reduce<ListaoRow[]>((acc, e, idx) => {
     const cotaContemplada = e.contrato_valor_credito ?? 0;
     const lanceEmb = e.lance_embutido ?? 0;
     const fc = e.valores_pagos?.fundo_comum ?? 0;
@@ -19,26 +34,31 @@ export function ListaoPreview({ extracts }: { extracts: Extract[] }) {
     const txAdm = e.valores_pagos?.taxa_administracao ?? 0;
     const pagamentos = fc + fr + txAdm;
     const saldoContemp = cotaContemplada - lanceEmb;
-    runSaldo += saldoContemp;
-    runPagamentos += pagamentos;
-    const saldoCreditoParcelas = saldoContemp - runPagamentos;
+    const previous = acc[acc.length - 1];
+    const soma = (previous?.soma ?? 0) + saldoContemp;
+    const pagamentosAcumulados = (previous?.pagamentosAcumulados ?? 0) + pagamentos;
+    const saldoCreditoParcelas = saldoContemp - pagamentosAcumulados;
 
-    return {
-      mes: idx + 1,
-      grupo: e.grupo,
-      cota: e.cota,
-      dataEmissao: e.data_emissao,
-      cotaContemplada,
-      fc,
-      fr,
-      txAdm,
-      lanceEmb,
-      saldoContemp,
-      soma: runSaldo,
-      pagamentos,
-      saldoCreditoParcelas,
-    };
-  });
+    return [
+      ...acc,
+      {
+        mes: idx + 1,
+        grupo: e.grupo,
+        cota: e.cota,
+        dataEmissao: e.data_emissao,
+        cotaContemplada,
+        fc,
+        fr,
+        txAdm,
+        lanceEmb,
+        saldoContemp,
+        soma,
+        pagamentos,
+        pagamentosAcumulados,
+        saldoCreditoParcelas,
+      },
+    ];
+  }, []);
 
   const totalCota = rows.reduce((s, r) => s + r.cotaContemplada, 0);
   const totalFC = rows.reduce((s, r) => s + r.fc, 0);

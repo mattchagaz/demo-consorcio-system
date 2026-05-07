@@ -58,7 +58,7 @@ export default function Home() {
       if (abortRef.current.signal.aborted) break;
 
       const fd = new FormData();
-      fd.append("files", files[i]);
+      fd.append("files", files[i], files[i].name);
 
       try {
         const res = await fetch(`${API}/extract`, {
@@ -120,7 +120,7 @@ export default function Home() {
       } else {
         // Fallback: send files directly
         const fd = new FormData();
-        files.forEach((f) => fd.append("files", f));
+        files.forEach((f) => fd.append("files", f, f.name));
         res = await fetch(`${API}/export`, { method: "POST", body: fd });
       }
 
