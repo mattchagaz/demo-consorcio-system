@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import tempfile
 from datetime import datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,18 +28,30 @@ async def _parse_uploads(files: list[UploadFile]) -> list[ExtractResult]:
     with tempfile.TemporaryDirectory() as tmp:
         tmpdir = Path(tmp)
         for f in files:
-            if not f.filename or not f.filename.lower().endswith(".pdf"):
+            filename = _upload_basename(f.filename)
+            if not filename or not filename.lower().endswith(".pdf"):
                 raise HTTPException(400, f"Only PDFs supported: {f.filename}")
-            dest = tmpdir / f.filename
-            dest.write_bytes(await f.read())
+            dest = tmpdir / filename
+            try:
+                dest.write_bytes(await f.read())
+            except Exception as e:
+                raise HTTPException(400, f"Falha ao receber {filename}: {e}")
             try:
                 results.append(parse_pdf(str(dest)))
             except InvalidPDFError as e:
                 raise HTTPException(400, str(e))
             except Exception as e:
-                raise HTTPException(422, f"Falha ao processar {f.filename}: {e}")
+                raise HTTPException(422, f"Falha ao processar {filename}: {e}")
     results.sort(key=lambda r: (r.grupo, r.cota))
     return results
+
+
+def _upload_basename(filename: str | None) -> str:
+    """Return a safe basename for uploads that may include a folder path."""
+    if not filename:
+        return ""
+    normalized = filename.replace("\\", "/")
+    return PurePosixPath(normalized).name
 
 
 def _dict_to_extract(d: dict) -> ExtractResult:
