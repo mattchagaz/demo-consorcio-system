@@ -1,9 +1,10 @@
 """PDF parser for HS Administradora consorcio extracts.
 
-Extracts (from "Conta Corrente" section onwards, ignoring Dados Cadastrais/Plano):
+Extracts from HS Administradora consorcio statements:
   - Header: Grupo, Cota, Nome, Contrato
+  - Dados do Plano: Taxa Adm, Fundo Reserva, % Mensal Fundo Comum, % Mensal c/ Taxas
   - Conta Corrente rows (one per installment paid)
-  - Valores / Percentuais Pagos: Fundo Comum, Fundo de Reserva, Taxa de Administração
+  - Valores / Percentuais Pagos and a Pagar
   - Qtde parcelas pagas (Resumo Parcelas Pagas)
 """
 from __future__ import annotations
@@ -44,17 +45,40 @@ CC_ROW_RE = re.compile(
     r"(?P<pct_difer>[\d.,]+)\s*$"
 )
 
-# "Fundo Comum: 1.446,76 0,5668 Fundo Comum: 263.009,09 99,4274"
-VALOR_PAGO_LINE_RE = lambda label: re.compile(
-    rf"{re.escape(label)}:\s+(?P<pago>[\d.,]+)\s+[\d.,]+\s+.+?:\s+[\d.,]+"
-)
-
 QTDE_TOTAL_RE = re.compile(r"Qtde Total:\s*(\d+)")
 PRAZO_RE = re.compile(r"Prazo do grupo:\s*(\d+)\s*meses")
+
+VALORES_SIDE_BY_SIDE = [
+    ("Fundo Comum", "Fundo Comum", "fundo_comum"),
+    ("Fundo de Reserva", "Fundo de Reserva", "fundo_reserva"),
+    ("Taxa de Administração", "Taxa de Administração", "taxa_administracao"),
+    ("Adesão(-)", "Adesão", "adesao"),
+    ("Seguros", "Seguros", "seguros"),
+    ("Multas", "Multas", "multas"),
+    ("Juros", "Juros", "juros"),
+    ("Outros Valores", "Outros Valores", "outros_valores"),
+]
+
+NUM_TOKEN = r"-?\d[\d.]*,\d+"
 
 
 def _to_float(s: str) -> float:
     return float(s.replace(".", "").replace(",", "."))
+
+
+def _to_float_or_zero(s: str | None) -> float:
+    if not s:
+        return 0.0
+    try:
+        return _to_float(s)
+    except ValueError:
+        return 0.0
+
+
+def _pct_from_amount(amount: float, credito: float) -> float:
+    if not credito:
+        return 0.0
+    return (amount / credito) * 100
 
 
 @dataclass
@@ -76,14 +100,57 @@ class ContaCorrenteRow:
 
 
 @dataclass
+class DadosPlano:
+    taxa_administracao: float = 0.0
+    fundo_reserva: float = 0.0
+    pct_mensal_fundo_comum: float = 0.0
+    pct_mensal_com_taxas: float = 0.0
+
+
+@dataclass
 class ValoresPagos:
     fundo_comum: float = 0.0
+    fundo_comum_pct: float = 0.0
     fundo_reserva: float = 0.0
+    fundo_reserva_pct: float = 0.0
     taxa_administracao: float = 0.0
+    taxa_administracao_pct: float = 0.0
+    adesao: float = 0.0
+    adesao_pct: float = 0.0
+    seguros: float = 0.0
+    seguros_pct: float = 0.0
+    multas: float = 0.0
+    multas_pct: float = 0.0
+    juros: float = 0.0
+    juros_pct: float = 0.0
+    outros_valores: float = 0.0
+    outros_valores_pct: float = 0.0
+    diferenca_parcela: float = 0.0
+    diferenca_parcela_pct: float = 0.0
+    total: float = 0.0
+    total_pct: float = 0.0
 
-    @property
-    def total(self) -> float:
-        return self.fundo_comum + self.fundo_reserva + self.taxa_administracao
+
+@dataclass
+class ValoresAPagar:
+    fundo_comum: float = 0.0
+    fundo_comum_pct: float = 0.0
+    fundo_reserva: float = 0.0
+    fundo_reserva_pct: float = 0.0
+    taxa_administracao: float = 0.0
+    taxa_administracao_pct: float = 0.0
+    adesao: float = 0.0
+    adesao_pct: float = 0.0
+    seguros: float = 0.0
+    seguros_pct: float = 0.0
+    multas: float = 0.0
+    multas_pct: float = 0.0
+    juros: float = 0.0
+    juros_pct: float = 0.0
+    outros_valores: float = 0.0
+    outros_valores_pct: float = 0.0
+    total: float = 0.0
+    total_pct: float = 0.0
 
 
 @dataclass
@@ -97,8 +164,10 @@ class ExtractResult:
     lance_embutido: float = 0.0
     prazo_total: int = 0
     qtde_parcelas_pagas: int = 0
+    dados_plano: DadosPlano = field(default_factory=DadosPlano)
     conta_corrente: list[ContaCorrenteRow] = field(default_factory=list)
     valores_pagos: ValoresPagos = field(default_factory=ValoresPagos)
+    valores_a_pagar: ValoresAPagar = field(default_factory=ValoresAPagar)
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -143,21 +212,100 @@ def parse_pdf(path: str) -> ExtractResult:
     return parse_text(text)
 
 
-def _extract_valor_pago(text: str, label: str) -> float:
-    """Extract the 'Pagos' column value (first number after label) in the
-    'Valores / Percentuais Pagos' section."""
-    pagos_idx = text.find("Valores / Percentuais Pagos")
-    if pagos_idx == -1:
-        return 0.0
-    # search only within the block
-    block = text[pagos_idx : pagos_idx + 1500]
-    m = VALOR_PAGO_LINE_RE(label).search(block)
-    if not m:
-        return 0.0
-    try:
-        return _to_float(m.group("pago"))
-    except (ValueError, IndexError):
-        return 0.0
+def _extract_block(text: str, start_marker: str, end_marker: str | None = None) -> str:
+    start = text.find(start_marker)
+    if start == -1:
+        return ""
+    end = text.find(end_marker, start) if end_marker else -1
+    return text[start : end if end != -1 else len(text)]
+
+
+def _extract_plano_value(block: str, label: str) -> float:
+    m = re.search(rf"{re.escape(label)}:\s*(?P<value>{NUM_TOKEN})", block)
+    return _to_float_or_zero(m.group("value") if m else None)
+
+
+def _extract_dados_plano(text: str) -> DadosPlano:
+    block = _extract_block(text, "Dados do Plano", "Conta Corrente")
+    return DadosPlano(
+        taxa_administracao=_extract_plano_value(block, "Taxa Adm"),
+        fundo_reserva=_extract_plano_value(block, "Fundo Reserva"),
+        pct_mensal_fundo_comum=_extract_plano_value(block, "% Mensal do Fundo Comum"),
+        pct_mensal_com_taxas=_extract_plano_value(block, "% Mensal c/ Taxas"),
+    )
+
+
+def _set_valor_percentual(obj: ValoresPagos | ValoresAPagar, key: str, value: float, pct: float) -> None:
+    setattr(obj, key, value)
+    setattr(obj, f"{key}_pct", pct)
+
+
+def _parse_valores_percentuais(text: str, credito: float) -> tuple[ValoresPagos, ValoresAPagar]:
+    pagos = ValoresPagos()
+    a_pagar = ValoresAPagar()
+    block = _extract_block(text, "Valores / Percentuais Pagos", "Resumo Parcelas a Pagar")
+
+    for line in block.splitlines():
+        clean = line.strip()
+        if not clean:
+            continue
+
+        for paid_label, payable_label, key in VALORES_SIDE_BY_SIDE:
+            pattern = re.compile(
+                rf"^{re.escape(paid_label)}:\s+"
+                rf"(?P<paid_value>{NUM_TOKEN})"
+                rf"(?:\s+(?P<paid_pct>{NUM_TOKEN}))?\s+"
+                rf"{re.escape(payable_label)}:\s+"
+                rf"(?P<payable_value>{NUM_TOKEN})"
+                rf"(?:\s+(?P<payable_pct>{NUM_TOKEN}))?"
+            )
+            if m := pattern.match(clean):
+                paid_value = _to_float_or_zero(m.group("paid_value"))
+                paid_pct = (
+                    _to_float_or_zero(m.group("paid_pct"))
+                    if m.group("paid_pct") is not None
+                    else _pct_from_amount(paid_value, credito)
+                )
+                payable_value = _to_float_or_zero(m.group("payable_value"))
+                payable_pct = (
+                    _to_float_or_zero(m.group("payable_pct"))
+                    if m.group("payable_pct") is not None
+                    else _pct_from_amount(payable_value, credito)
+                )
+                _set_valor_percentual(pagos, key, paid_value, paid_pct)
+                _set_valor_percentual(a_pagar, key, payable_value, payable_pct)
+                break
+        else:
+            if m := re.match(
+                rf"^Diferença de Parcela:\s+(?P<value>{NUM_TOKEN})(?:\s+(?P<pct>{NUM_TOKEN}))?",
+                clean,
+            ):
+                value = _to_float_or_zero(m.group("value"))
+                pct = (
+                    _to_float_or_zero(m.group("pct"))
+                    if m.group("pct") is not None
+                    else _pct_from_amount(value, credito)
+                )
+                _set_valor_percentual(pagos, "diferenca_parcela", value, pct)
+            elif m := re.match(
+                rf"^TOTAL\s+(?P<paid_value>{NUM_TOKEN})\s+(?P<paid_pct>{NUM_TOKEN})\s+"
+                rf"TOTAL\s+(?P<payable_value>{NUM_TOKEN})\s+(?P<payable_pct>{NUM_TOKEN})",
+                clean,
+            ):
+                _set_valor_percentual(
+                    pagos,
+                    "total",
+                    _to_float_or_zero(m.group("paid_value")),
+                    _to_float_or_zero(m.group("paid_pct")),
+                )
+                _set_valor_percentual(
+                    a_pagar,
+                    "total",
+                    _to_float_or_zero(m.group("payable_value")),
+                    _to_float_or_zero(m.group("payable_pct")),
+                )
+
+    return pagos, a_pagar
 
 
 def parse_text(text: str) -> ExtractResult:
@@ -174,6 +322,14 @@ def parse_text(text: str) -> ExtractResult:
 
     if m := PRAZO_RE.search(text):
         result.prazo_total = int(m.group(1))
+
+    if m := VALOR_CREDITO_RE.search(text):
+        try:
+            result.contrato_valor_credito = _to_float(m.group(1))
+        except ValueError:
+            pass
+
+    result.dados_plano = _extract_dados_plano(text)
 
     # Conta Corrente rows
     cc_start = text.find("Conta Corrente")
@@ -211,18 +367,11 @@ def parse_text(text: str) -> ExtractResult:
             except ValueError:
                 pass
 
-    # Valores / Percentuais Pagos
-    result.valores_pagos = ValoresPagos(
-        fundo_comum=_extract_valor_pago(text, "Fundo Comum"),
-        fundo_reserva=_extract_valor_pago(text, "Fundo de Reserva"),
-        taxa_administracao=_extract_valor_pago(text, "Taxa de Administração"),
+    # Valores / Percentuais Pagos and a Pagar
+    result.valores_pagos, result.valores_a_pagar = _parse_valores_percentuais(
+        text,
+        result.contrato_valor_credito,
     )
-
-    if m := VALOR_CREDITO_RE.search(text):
-        try:
-            result.contrato_valor_credito = _to_float(m.group(1))
-        except ValueError:
-            pass
 
     # Lance embutido — pdfplumber garbles the dates on these rows, so use a
     # position-based approach: anchor on the last clean date, then numbers after
