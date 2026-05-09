@@ -4,42 +4,70 @@ import { useState } from "react";
 import { Settings2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-export type ColumnKey =
-  | "num"
-  | "grupo"
-  | "cota"
-  | "contrato"
-  | "emissao"
-  | "prazo"
-  | "parcelas"
-  | "vencto"
-  | "pagto"
-  | "vl_credito"
-  | "vl_devido"
-  | "vl_pago"
-  | "pct_pago"
-  | "quota_consorcio"
-  | "fundo_reserva"
-  | "taxa_adm";
-
-export const ALL_COLUMNS: { key: ColumnKey; label: string }[] = [
+export const ALL_COLUMNS = [
   { key: "num", label: "#" },
   { key: "grupo", label: "Grupo" },
   { key: "cota", label: "Cota" },
+  { key: "nome", label: "Nome" },
   { key: "contrato", label: "Contrato" },
   { key: "emissao", label: "Emissão" },
   { key: "prazo", label: "Prazo" },
   { key: "parcelas", label: "Parcelas" },
+  { key: "plano_taxa_adm", label: "Taxa Adm (%)" },
+  { key: "plano_fundo_reserva", label: "Fundo Reserva (%)" },
+  { key: "plano_pct_mensal_fundo_comum", label: "% Mensal Fundo Comum" },
+  { key: "plano_pct_mensal_com_taxas", label: "% Mensal c/ Taxas" },
   { key: "vencto", label: "Vencto" },
   { key: "pagto", label: "Pagto" },
   { key: "vl_credito", label: "Vl. Crédito" },
   { key: "vl_devido", label: "Vl. Devido" },
   { key: "vl_pago", label: "Vl. Pago" },
+  { key: "multa", label: "Multa" },
+  { key: "juros", label: "Juros" },
+  { key: "seguro", label: "Seguro" },
   { key: "pct_pago", label: "% Pago" },
-  { key: "quota_consorcio", label: "Quota Consórcio" },
+  { key: "pct_difer", label: "% Difer" },
+  { key: "quota_consorcio", label: "Fundo Comum Pago" },
+  { key: "quota_consorcio_pct", label: "% Fundo Comum Pago" },
   { key: "fundo_reserva", label: "Fundo Reserva" },
+  { key: "fundo_reserva_pct", label: "% Fundo Reserva Pago" },
   { key: "taxa_adm", label: "Taxa ADM" },
-];
+  { key: "taxa_adm_pct", label: "% Taxa ADM Paga" },
+  { key: "adesao_pago", label: "Adesão Paga" },
+  { key: "adesao_pago_pct", label: "% Adesão Paga" },
+  { key: "seguros_pagos", label: "Seguros Pagos" },
+  { key: "seguros_pagos_pct", label: "% Seguros Pagos" },
+  { key: "multas_pagas", label: "Multas Pagas" },
+  { key: "multas_pagas_pct", label: "% Multas Pagas" },
+  { key: "juros_pagos", label: "Juros Pagos" },
+  { key: "juros_pagos_pct", label: "% Juros Pagos" },
+  { key: "outros_valores_pagos", label: "Outros Valores Pagos" },
+  { key: "outros_valores_pagos_pct", label: "% Outros Valores Pagos" },
+  { key: "diferenca_parcela_paga", label: "Diferença Parcela Paga" },
+  { key: "diferenca_parcela_paga_pct", label: "% Diferença Parcela Paga" },
+  { key: "total_pago_valores", label: "Total Pago" },
+  { key: "total_pago_valores_pct", label: "% Total Pago" },
+  { key: "pagar_fundo_comum", label: "Fundo Comum a Pagar" },
+  { key: "pagar_fundo_comum_pct", label: "% Fundo Comum a Pagar" },
+  { key: "pagar_fundo_reserva", label: "Fundo Reserva a Pagar" },
+  { key: "pagar_fundo_reserva_pct", label: "% Fundo Reserva a Pagar" },
+  { key: "pagar_taxa_adm", label: "Taxa ADM a Pagar" },
+  { key: "pagar_taxa_adm_pct", label: "% Taxa ADM a Pagar" },
+  { key: "pagar_adesao", label: "Adesão a Pagar" },
+  { key: "pagar_adesao_pct", label: "% Adesão a Pagar" },
+  { key: "pagar_seguros", label: "Seguros a Pagar" },
+  { key: "pagar_seguros_pct", label: "% Seguros a Pagar" },
+  { key: "pagar_multas", label: "Multas a Pagar" },
+  { key: "pagar_multas_pct", label: "% Multas a Pagar" },
+  { key: "pagar_juros", label: "Juros a Pagar" },
+  { key: "pagar_juros_pct", label: "% Juros a Pagar" },
+  { key: "pagar_outros_valores", label: "Outros Valores a Pagar" },
+  { key: "pagar_outros_valores_pct", label: "% Outros Valores a Pagar" },
+  { key: "total_a_pagar", label: "Total a Pagar" },
+  { key: "total_a_pagar_pct", label: "% Total a Pagar" },
+] as const;
+
+export type ColumnKey = (typeof ALL_COLUMNS)[number]["key"];
 
 const DEFAULT_KEYS = ALL_COLUMNS.map((c) => c.key);
 

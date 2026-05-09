@@ -213,7 +213,8 @@ export default function AdminPage() {
               <h3 className="text-sm font-semibold text-slate-700">Últimas operações</h3>
               {metrics && (
                 <span className="text-xs text-slate-500">
-                  {numberFmt.format(metrics.totals.jobs)} registro{metrics.totals.jobs === 1 ? "" : "s"}
+                  Mostrando {numberFmt.format(metrics.recent_jobs.length)} de{" "}
+                  {numberFmt.format(metrics.totals.jobs)}
                 </span>
               )}
             </div>
@@ -229,47 +230,49 @@ export default function AdminPage() {
                 Nenhuma conversão registrada ainda
               </div>
             ) : (
-              <ul className="divide-y divide-slate-100">
-                {metrics.recent_jobs.map((job) => (
-                  <li key={job.id} className="px-6 py-4 flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="text-sm font-medium text-slate-900">
-                          {actionLabel(job.action)}
+              <div className="max-h-[28rem] overflow-y-auto">
+                <ul className="divide-y divide-slate-100">
+                  {metrics.recent_jobs.map((job) => (
+                    <li key={job.id} className="px-6 py-4 flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="text-sm font-medium text-slate-900">
+                            {actionLabel(job.action)}
+                          </p>
+                          <span
+                            className={
+                              job.status === "success"
+                                ? "px-2 py-0.5 rounded-full bg-emerald-50 text-xs font-medium text-emerald-700 border border-emerald-100"
+                                : "px-2 py-0.5 rounded-full bg-red-50 text-xs font-medium text-red-700 border border-red-100"
+                            }
+                          >
+                            {job.status === "success" ? "Sucesso" : "Erro"}
+                          </span>
+                        </div>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {formatDateTime(job.created_at)} · {job.user_email ?? "Usuário não informado"}
                         </p>
-                        <span
-                          className={
-                            job.status === "success"
-                              ? "px-2 py-0.5 rounded-full bg-emerald-50 text-xs font-medium text-emerald-700 border border-emerald-100"
-                              : "px-2 py-0.5 rounded-full bg-red-50 text-xs font-medium text-red-700 border border-red-100"
-                          }
-                        >
-                          {job.status === "success" ? "Sucesso" : "Erro"}
-                        </span>
+                        {job.file_names.length > 0 && (
+                          <p className="mt-1 text-xs text-slate-500 truncate">
+                            {job.file_names.slice(0, 4).join(", ")}
+                            {job.file_names.length > 4 ? ` +${job.file_names.length - 4}` : ""}
+                          </p>
+                        )}
+                        {job.error_message && (
+                          <p className="mt-1 text-xs text-red-600 truncate">{job.error_message}</p>
+                        )}
                       </div>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {formatDateTime(job.created_at)} · {job.user_email ?? "Usuário não informado"}
-                      </p>
-                      {job.file_names.length > 0 && (
-                        <p className="mt-1 text-xs text-slate-500 truncate">
-                          {job.file_names.slice(0, 4).join(", ")}
-                          {job.file_names.length > 4 ? ` +${job.file_names.length - 4}` : ""}
-                        </p>
-                      )}
-                      {job.error_message && (
-                        <p className="mt-1 text-xs text-red-600 truncate">{job.error_message}</p>
-                      )}
-                    </div>
-                    <div className="shrink-0 text-right text-xs text-slate-500">
-                      <p>{numberFmt.format(job.uploaded_count)} enviados</p>
-                      <p>{numberFmt.format(job.parsed_count)} convertidos</p>
-                      {job.output_count > 0 && (
-                        <p>{numberFmt.format(job.output_count)} no Excel</p>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
+                      <div className="shrink-0 text-right text-xs text-slate-500">
+                        <p>{numberFmt.format(job.uploaded_count)} enviados</p>
+                        <p>{numberFmt.format(job.parsed_count)} convertidos</p>
+                        {job.output_count > 0 && (
+                          <p>{numberFmt.format(job.output_count)} no Excel</p>
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         </section>

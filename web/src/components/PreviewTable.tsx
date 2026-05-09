@@ -22,8 +22,53 @@ export type Parcela = {
 
 export type ValoresPagos = {
   fundo_comum: number;
+  fundo_comum_pct: number;
   fundo_reserva: number;
+  fundo_reserva_pct: number;
   taxa_administracao: number;
+  taxa_administracao_pct: number;
+  adesao: number;
+  adesao_pct: number;
+  seguros: number;
+  seguros_pct: number;
+  multas: number;
+  multas_pct: number;
+  juros: number;
+  juros_pct: number;
+  outros_valores: number;
+  outros_valores_pct: number;
+  diferenca_parcela: number;
+  diferenca_parcela_pct: number;
+  total: number;
+  total_pct: number;
+};
+
+export type ValoresAPagar = {
+  fundo_comum: number;
+  fundo_comum_pct: number;
+  fundo_reserva: number;
+  fundo_reserva_pct: number;
+  taxa_administracao: number;
+  taxa_administracao_pct: number;
+  adesao: number;
+  adesao_pct: number;
+  seguros: number;
+  seguros_pct: number;
+  multas: number;
+  multas_pct: number;
+  juros: number;
+  juros_pct: number;
+  outros_valores: number;
+  outros_valores_pct: number;
+  total: number;
+  total_pct: number;
+};
+
+export type DadosPlano = {
+  taxa_administracao: number;
+  fundo_reserva: number;
+  pct_mensal_fundo_comum: number;
+  pct_mensal_com_taxas: number;
 };
 
 export type Extract = {
@@ -36,8 +81,10 @@ export type Extract = {
   lance_embutido: number;
   prazo_total: number;
   qtde_parcelas_pagas: number;
+  dados_plano: DadosPlano;
   conta_corrente: Parcela[];
   valores_pagos: ValoresPagos;
+  valores_a_pagar: ValoresAPagar;
 };
 
 const fmtBRL = (v: number) =>
