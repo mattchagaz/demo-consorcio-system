@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
+import { useUser } from "@clerk/nextjs";
 import { Download, Loader2, Eye, Sparkles } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Dropzone } from "@/components/Dropzone";
@@ -16,6 +17,7 @@ import { Toast } from "@/components/Toast";
 const API = "/api";
 
 export default function Home() {
+  const { user } = useUser();
   const [files, setFiles] = useState<File[]>([]);
   const [extracts, setExtracts] = useState<Extract[]>([]);
   const [loading, setLoading] = useState<"preview" | "export" | null>(null);
@@ -46,6 +48,7 @@ export default function Home() {
   };
 
   const doPreview = async () => {
+    const userEmail = user?.primaryEmailAddress?.emailAddress;
     setLoading("preview");
     setExtracts([]);
     setProgress({ current: 0, total: files.length });
@@ -59,6 +62,7 @@ export default function Home() {
 
       const fd = new FormData();
       fd.append("files", files[i], files[i].name);
+      if (userEmail) fd.append("user_email", userEmail);
 
       try {
         const res = await fetch(`${API}/extract`, {
@@ -103,6 +107,7 @@ export default function Home() {
   };
 
   const doExport = async () => {
+    const userEmail = user?.primaryEmailAddress?.emailAddress;
     setLoading("export");
     try {
       let res: Response;
@@ -115,12 +120,14 @@ export default function Home() {
           body: JSON.stringify({
             extracts: extracts,
             columns: selectedColumns,
+            user_email: userEmail,
           }),
         });
       } else {
         // Fallback: send files directly
         const fd = new FormData();
         files.forEach((f) => fd.append("files", f, f.name));
+        if (userEmail) fd.append("user_email", userEmail);
         res = await fetch(`${API}/export`, { method: "POST", body: fd });
       }
 

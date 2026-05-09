@@ -28,6 +28,42 @@ function appUrl(path: string) {
   return new URL(path, baseUrl).toString();
 }
 
+function apiUrl(path: string) {
+  const baseUrl = process.env.API_URL ?? "http://localhost:8000";
+  return new URL(path, baseUrl).toString();
+}
+
+export type ConversionMetricBucket = {
+  jobs: number;
+  uploaded_count: number;
+  parsed_count: number;
+  failed_count: number;
+  output_count: number;
+  excel_count: number;
+};
+
+export type ConversionMetricJob = {
+  id: number;
+  created_at: string;
+  action: "preview" | "export" | "export_json";
+  user_email: string | null;
+  uploaded_count: number;
+  parsed_count: number;
+  failed_count: number;
+  output_count: number;
+  status: "success" | "error";
+  error_message: string | null;
+  file_names: string[];
+};
+
+export type ConversionMetrics = {
+  db_path: string;
+  totals: ConversionMetricBucket;
+  today: ConversionMetricBucket;
+  daily: Array<{ date: string } & ConversionMetricBucket>;
+  recent_jobs: ConversionMetricJob[];
+};
+
 export async function listUsers() {
   await requireAdmin();
   const clerk = await clerkClient();
@@ -56,4 +92,22 @@ export async function removeUser(userId: string) {
   if (userId === admin.id) throw new Error("Você não pode remover a si mesmo");
   const clerk = await clerkClient();
   await clerk.users.deleteUser(userId);
+}
+
+export async function getConversionMetrics(): Promise<ConversionMetrics> {
+  await requireAdmin();
+  const headers: Record<string, string> = {};
+  const token = process.env.API_METRICS_TOKEN ?? process.env.METRICS_TOKEN;
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch(apiUrl("/metrics/summary"), {
+    headers,
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    throw new Error(await res.text());
+  }
+
+  return res.json();
 }
