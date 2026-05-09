@@ -8,7 +8,6 @@ export const ALL_COLUMNS = [
   { key: "num", label: "#" },
   { key: "grupo", label: "Grupo" },
   { key: "cota", label: "Cota" },
-  { key: "nome", label: "Nome" },
   { key: "contrato", label: "Contrato" },
   { key: "emissao", label: "Emissão" },
   { key: "prazo", label: "Prazo" },
