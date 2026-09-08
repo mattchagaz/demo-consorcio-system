@@ -2,6 +2,10 @@
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
+# Keep one machine ready in GRU. The frontend proxies uploads to this service;
+# a cold start can otherwise make Vercel's upstream TLS connection time out and
+# surface as a 502 ROUTER_EXTERNAL_TARGET_HANDSHAKE_ERROR to the user.
+#
 
 app = 'consorcio-api'
 primary_region = 'gru'
@@ -13,7 +17,7 @@ primary_region = 'gru'
   force_https = true
   auto_stop_machines = 'stop'
   auto_start_machines = true
-  min_machines_running = 0
+min_machines_running = 1
   processes = ['app']
 
 [mounts]

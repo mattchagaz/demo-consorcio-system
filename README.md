@@ -25,6 +25,27 @@ npm run dev               # Next em localhost:3000
 
 Abra http://localhost:3000, arraste os PDFs, pré-visualize ou baixe o XLSX.
 
+## Publicação na VPS
+
+A API pode ser publicada com Docker em uma VPS que já tenha um Caddy reverso.
+O Caddy emite e renova o certificado HTTPS automaticamente para
+`api.itacordaparticipacoes.com.br`.
+
+1. No DNS, aponte o registro `A` de `api` para o IP da VPS.
+2. Na VPS, instale Docker Engine e o plugin Docker Compose.
+3. Copie `api/.env.example` para `api/.env` e troque `METRICS_TOKEN` por um
+   valor longo e aleatório.
+4. No Caddy da VPS, inclua o conteúdo de `api/Caddyfile` no arquivo de
+   configuração e valide-o antes de recarregar o proxy.
+5. Dentro da pasta `api`, execute `docker compose up -d --build`. O Compose
+   usa a rede externa `vps_private`; adapte esse nome caso a VPS use outra
+   rede para o Caddy.
+6. Na Vercel, configure `API_URL=https://api.itacordaparticipacoes.com.br` e
+   `API_METRICS_TOKEN` com o mesmo valor de `METRICS_TOKEN`, então faça um
+   novo deploy do frontend.
+
+Para conferir a API depois da publicação: `curl https://api.itacordaparticipacoes.com.br/health`.
+
 ## Endpoints da API
 
 | Método | Rota       | Retorno                                              |

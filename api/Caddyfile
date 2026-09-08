@@ -1,0 +1,5 @@
+api.itacordaparticipacoes.com.br {
+    encode zstd gzip
+
+    reverse_proxy consorcio-pdf-api:8080
+}

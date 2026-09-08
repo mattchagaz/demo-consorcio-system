@@ -1,0 +1,19 @@
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - api_data:/data
+    networks:
+      vps_private:
+        aliases:
+          - consorcio-pdf-api
+
+volumes:
+  api_data:
+
+networks:
+  vps_private:
+    external: true
