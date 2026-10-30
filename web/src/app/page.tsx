@@ -13,8 +13,10 @@ import { ViewTabs, type View } from "@/components/ViewTabs";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ColumnPicker, ALL_COLUMNS, type ColumnKey } from "@/components/ColumnPicker";
 import { Toast } from "@/components/Toast";
+import { StorageLimitModal } from "@/components/StorageLimitModal";
 
 const API = "/api";
+const STORAGE_LIMIT_REACHED = true;
 
 export default function Home() {
   const { user } = useUser();
@@ -23,6 +25,7 @@ export default function Home() {
   const [loading, setLoading] = useState<"preview" | "export" | null>(null);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [toast, setToast] = useState<{ kind: "error" | "success"; message: string } | null>(null);
+  const [storageLimitOpen, setStorageLimitOpen] = useState(false);
   const [view, setView] = useState<View>("cards");
   const [selectedColumns, setSelectedColumns] = useState<ColumnKey[]>(
     ALL_COLUMNS.map((c) => c.key)
@@ -48,6 +51,11 @@ export default function Home() {
   };
 
   const doPreview = async () => {
+    if (STORAGE_LIMIT_REACHED) {
+      setStorageLimitOpen(true);
+      return;
+    }
+
     const userEmail = user?.primaryEmailAddress?.emailAddress;
     setLoading("preview");
     setExtracts([]);
@@ -107,6 +115,11 @@ export default function Home() {
   };
 
   const doExport = async () => {
+    if (STORAGE_LIMIT_REACHED) {
+      setStorageLimitOpen(true);
+      return;
+    }
+
     const userEmail = user?.primaryEmailAddress?.emailAddress;
     setLoading("export");
     try {
@@ -264,6 +277,11 @@ export default function Home() {
           onDismiss={() => setToast(null)}
         />
       )}
+
+      <StorageLimitModal
+        open={storageLimitOpen}
+        onClose={() => setStorageLimitOpen(false)}
+      />
     </div>
   );
 }
