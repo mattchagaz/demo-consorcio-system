@@ -60,19 +60,15 @@ export function StorageLimitModal({ open, onClose }: Props) {
           id="storage-limit-description"
           className="mt-3 text-sm leading-6 text-slate-600"
         >
-          Seu espaço disponível acabou. Para converter novos arquivos, libere
-          espaço no armazenamento ou amplie o limite do seu plano.
+          Seu espaço disponível acabou. Para converter novos arquivos, amplie o
+          limite do seu plano.
         </p>
-
-        <div className="mt-7 rounded-2xl border border-amber-100 bg-amber-50/80 px-4 py-3 text-sm text-amber-900">
-          Seus arquivos atuais continuam seguros e não serão alterados.
-        </div>
 
         <button
           type="button"
           onClick={onClose}
           autoFocus
-          className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          className="mt-7 inline-flex w-full items-center justify-center rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-indigo-600/20 transition hover:from-indigo-500 hover:to-purple-500 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
         >
           Entendi
         </button>
